@@ -65,6 +65,7 @@
 ;; your ~/.emacs:
 ;;
 ;;   (require 'custom-faces-file)
+;;   (enable-custom-faces-file)
 ;;
 ;; Next, you want to set the custom-faces-file variable to something, then
 ;; load the file it points to.
@@ -74,9 +75,9 @@
 ;;   (load (custom-faces-file))
 ;;
 ;; A more complex example:
-;;   (cond ((eq window-system 'x)
+;;   (cond ((eq (window-system) 'x)
 ;;          (setq custom-faces-file "~/.emacs-custom-faces-x.el"))
-;;         ((eq window-system nil)
+;;         ((eq (window-system) nil)
 ;;          (setq custom-faces-file "~/.emacs-custom-faces-tty.el")))
 ;;   (load custom-faces-file)
 ;;
@@ -96,6 +97,11 @@
 ;;
 ;; - that the custom-file function uses the value of the custom-file variable
 ;;   as the basis of its return value.
+;;
+;; BUGS:
+;;
+;; - will probably not work very well with multiple frames on
+;;   different window-systems.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -124,8 +130,8 @@ If set, variable `custom-file' only stores variable customizations.
 If nil, all customizations are stored in variable `custom-file'.
 
 The substring \"%s\" or \"%{window-system}\" will be replaced
-with the value of variable `window-system', or `tty' if value of
-variable `window-system' is NIL.
+with the return value of function `window-system', or `tty' if
+the aforementioned return value is NIL.
 
 The substring \"%{theme}\" will be replaced with a
 hyphen-separated list of themes from `custom-enabled-themes' or
@@ -163,7 +169,7 @@ This function returns the result of performing the
 ;; (replace-regexp-in-string REGEXP REP STRING &optional FIXEDCASE
 ;; LITERAL SUBEXP START)
 
-(defun setup-custom-faces-file ()
+(defun setup-custom-faces-file-advice ()
   "Advise customize to store variables and faces in different files.
 See the `custom-faces-file' variable."
   (defadvice custom-file
@@ -190,8 +196,7 @@ See the `custom-faces-file' variable."
 	  (let ((is-saving-custom-faces-file-only t))
 	    ;; so custom-save-faces runs, but custom-save-variables doesn't.
 	    ad-do-it))
-      ad-do-it))
-  (activate-custom-faces-file-advice))
+      ad-do-it)))
 
 (defun activate-custom-faces-file-advice ()
   "Internal function."
@@ -200,22 +205,28 @@ See the `custom-faces-file' variable."
   (ad-activate 'custom-save-faces)
   (ad-activate 'custom-save-all))
 
-(defun disable-custom-faces-file-advice ()
+(defun deactivate-custom-faces-file-advice ()
+  "Internal function."
+  (ad-deactivate 'custom-file)
+  (ad-deactivate 'custom-save-variables)
+  (ad-deactivate 'custom-save-faces)
+  (ad-deactivate 'custom-save-all))
+
+(defun disable-custom-faces-file ()
   "Disable custom-faces-file modifications to customize.
 Not intended to be used except for debugging."
   (interactive)
   (ad-disable-regexp "--custom-faces-file$")
-  (activate-custom-faces-file-advice))
+  (deactivate-custom-faces-file-advice))
 
-(defun enable-custom-faces-file-advice ()
+(defun enable-custom-faces-file ()
   "Disable custom-faces-file modifications to customize.
 Not intended to be used except for debugging."
   (interactive)
   (ad-enable-regexp "--custom-faces-file$")
   (activate-custom-faces-file-advice))
 
-(if (>= emacs-major-version 22)
-    (setup-custom-faces-file))
+(setup-custom-faces-file-advice)
 
 (provide 'custom-faces-file)
 
